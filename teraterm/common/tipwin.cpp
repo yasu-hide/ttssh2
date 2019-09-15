@@ -114,7 +114,7 @@ LRESULT CALLBACK CTipWin::WndProc(HWND hWnd, UINT nMsg,
 			return TRUE;
 
 		case WM_PAINT:
-			{
+			if(self) {
 				HBRUSH hbr;
 				HGDIOBJ holdbr;
 				RECT cr;
@@ -154,7 +154,7 @@ LRESULT CALLBACK CTipWin::WndProc(HWND hWnd, UINT nMsg,
 		case WM_NCHITTEST:
 			return HTTRANSPARENT;
 		case WM_SETTEXT:
-			{
+			if(self) {
 				LPCTSTR str = (LPCTSTR) lParam;
 				const int str_width = self->tWin->str_rect.right - self->tWin->str_rect.left;
 				const int str_height = self->tWin->str_rect.bottom - self->tWin->str_rect.top;
@@ -169,7 +169,6 @@ LRESULT CALLBACK CTipWin::WndProc(HWND hWnd, UINT nMsg,
 							 str_width + TIP_WIN_FRAME_WIDTH * 2, str_height + TIP_WIN_FRAME_WIDTH * 2,
 				             SWP_NOZORDER | SWP_NOMOVE | SWP_NOACTIVATE);
 				InvalidateRect(hWnd, NULL, FALSE);
-
 			}
 			break;
 		case WM_NCDESTROY:
@@ -182,9 +181,11 @@ LRESULT CALLBACK CTipWin::WndProc(HWND hWnd, UINT nMsg,
 				 */
 			break;
 		case WM_TIMER:
-			KillTimer(hWnd, self->timerid);
-			self->timerid = NULL;
-			self->SetVisible(FALSE);
+			if(self) {
+				KillTimer(hWnd, self->timerid);
+				self->timerid = NULL;
+				self->SetVisible(FALSE);
+			}
 			break;
 		default:
 			break;
@@ -209,6 +210,7 @@ CTipWin::~CTipWin()
 {
 	if(IsExists()) {
 		DestroyWindow(tWin->tip_wnd);
+		SetWindowLongPtr(tWin->tip_wnd, GWLP_USERDATA, NULL);
 		DeleteObject(tWin->tip_font);
 		tWin->tip_font = NULL;
 		free((void*)tWin->str);
