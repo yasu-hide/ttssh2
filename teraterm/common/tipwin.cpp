@@ -209,10 +209,7 @@ CTipWin::CTipWin(HWND src, int cx, int cy, const TCHAR *str)
 CTipWin::~CTipWin()
 {
 	if(IsExists()) {
-		DestroyWindow(tWin->tip_wnd);
-		SetWindowLongPtr(tWin->tip_wnd, GWLP_USERDATA, NULL);
-		DeleteObject(tWin->tip_font);
-		tWin->tip_font = NULL;
+		Destroy();
 		free((void*)tWin->str);
 		free(tWin);
 	}
@@ -277,6 +274,19 @@ VOID CTipWin::Create(HWND src, int cx, int cy, const TCHAR *str)
 	pts.x = cx;
 	pts.y = cy;
 	timerid = NULL;
+}
+
+VOID CTipWin::Destroy()
+{
+	if(IsExists()) {
+		// フォントの破棄
+		DeleteObject(tWin->tip_font);
+		tWin->tip_font = NULL;
+		// ウィンドウの破棄
+		DestroyWindow(tWin->tip_wnd);
+		SetWindowLongPtr(tWin->tip_wnd, GWLP_USERDATA, NULL);
+		tWin->tip_wnd = NULL;
+	}
 }
 
 VOID CTipWin::GetTextWidthHeight(HWND src, const TCHAR *str, int *width, int *height)
