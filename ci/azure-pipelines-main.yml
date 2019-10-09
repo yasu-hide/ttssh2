@@ -1,0 +1,64 @@
+---
+
+trigger:
+- ci-azurepipelines
+
+strategy:
+  matrix:
+    vs2019_win2019:
+      imageName: 'windows-2019'
+      vcvarsPath: 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat'
+    vs2017_win2016:
+      imageName: 'vs2017-win2016'
+      vcvarsPath: 'C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\VC\Auxiliary\Build\vcvarsall.bat'
+    vs2015_win2012r2:
+      imageName: 'vs2015-win2012r2'
+      vcvarsPath: 'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat'
+
+variables:
+  VCVARS_BAT: $(vcvarsPath)
+
+pool:
+  vmImage: $(imageName)
+
+steps:
+- task: DownloadBuildArtifacts@0
+  inputs:
+    buildType: specific
+    project: 230dcdda-850c-498f-a5c9-30f978507620
+    pipeline: 2
+    buildVersionToDownload: latest
+    downloadType: specific
+    itemPattern: '$(System.Jobname)-libs/**'
+    downloadPath: $(Build.BinariesDirectory)/libs/
+- task: CopyFiles@2
+  displayName: 'Copy prereq libs'
+  inputs:
+    sourceFolder: $(Build.BinariesDirectory)/libs/$(System.Jobname)-libs/
+    targetFolder: $(Build.SourcesDirectory)/libs/
+- task: CmdLine@2
+  displayName: 'Build snapshot'
+  inputs:
+    workingDirectory: 'installer'
+    script: |
+      call "%%VCVARS_BAT%%" x86
+      if %ERRORLEVEL% NEQ 0 goto :eof
+      call makearchive.bat debug
+- task: Bash@3
+  displayName: 'Rename snapshot'
+  inputs:
+    targetType: 'inline'
+    workingDirectory: 'installer'
+    script: |
+      mv snapshot-$(date +%Y%m%d) snapshot
+- task: ArchiveFiles@2
+  displayName: 'Archiving snapshot'
+  inputs:
+    rootFolderOrFile: installer/snapshot/
+    includeRootFolder: false
+    archiveFile: $(Build.ArtifactStagingDirectory)/$(System.Jobname)-snapshot.zip
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish snapshot'
+  inputs:
+    artifactName: $(System.Jobname)-snapshot
+    pathtoPublish: $(Build.ArtifactStagingDirectory)/$(System.Jobname)-snapshot.zip

@@ -1,0 +1,97 @@
+---
+
+trigger:
+- master
+
+strategy:
+  matrix:
+    vs2019_win2019:
+      imageName: 'windows-2019'
+      vcvarsPath: 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat'
+    vs2017_win2016:
+      imageName: 'vs2017-win2016'
+      vcvarsPath: 'C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\VC\Auxiliary\Build\vcvarsall.bat'
+    vs2015_win2012r2:
+      imageName: 'vs2015-win2012r2'
+      vcvarsPath: 'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat'
+
+variables:
+  REPOS_ONIGURUMA_URL: 'https://github.com/kkos/oniguruma.git'
+  REPOS_ONIGURUMA_TAG: 'v6.9.3'
+  REPOS_OPENSSL_URL: 'https://github.com/openssl/openssl.git'
+  REPOS_OPENSSL_TAG: 'OpenSSL_1_0_2t'
+  REPOS_PUTTY_URL: 'https://git.tartarus.org/simon/putty.git'
+  REPOS_PUTTY_TAG: '0.70'
+  REPOS_SFMT_URL: 'https://github.com/MersenneTwister-Lab/SFMT.git'
+  REPOS_SFMT_TAG: '1.5.1'
+  REPOS_ZLIB_URL: 'https://github.com/madler/zlib.git'
+  REPOS_ZLIB_TAG: 'v1.2.11'
+  VCVARS_BAT: $(vcvarsPath)
+
+pool:
+  vmImage: $(imageName)
+
+steps:
+- task: Bash@3
+  displayName: 'Clone prereq libs'
+  inputs:
+    targetType: 'inline'
+    workingDirectory: 'libs'
+    script: |
+      git clone -b $REPOS_ONIGURUMA_TAG $REPOS_ONIGURUMA_URL oniguruma
+      git clone -b $REPOS_OPENSSL_TAG $REPOS_OPENSSL_URL openssl
+      git clone -b $REPOS_SFMT_TAG $REPOS_SFMT_URL SFMT
+      git clone -b $REPOS_PUTTY_TAG $REPOS_PUTTY_URL putty
+      git clone -b $REPOS_ZLIB_TAG $REPOS_ZLIB_URL zlib
+- task: Bash@3
+  displayName: 'Prepare openssl libs'
+  inputs:
+    targetType: 'inline'
+    workingDirectory: 'libs'
+    script: |
+      cd openssl
+      perl Configure no-asm VC-WIN32
+      find . -type f -name Makefile -exec sed -i 's/\r//' {} \;
+      perl util/mkfiles.pl > MINFO
+      perl util/mk1mf.pl no-asm VC-WIN32 > ms/nt.mak
+      perl util/mk1mf.pl dll no-asm VC-WIN32 >ms/ntdll.mak
+      perl util/mk1mf.pl no-asm debug VC-WIN32 >ms/ntd.mak
+      cd ..
+- task: CmdLine@2
+  displayName: 'Build prereq libs'
+  inputs:
+    workingDirectory: 'libs'
+    script: |
+      call "%%VCVARS_BAT%%" x86
+      if %ERRORLEVEL% NEQ 0 goto :eof
+      call buildall.bat
+- task: CopyFiles@2
+  displayName: 'Copy prereq libs oniguruma'
+  inputs:
+    sourceFolder: libs/oniguruma/
+    targetFolder: $(Build.ArtifactStagingDirectory)/libs/oniguruma
+- task: CopyFiles@2
+  displayName: 'Copy prereq libs openssl'
+  inputs:
+    sourceFolder: libs/openssl/
+    targetFolder: $(Build.ArtifactStagingDirectory)/libs/openssl
+- task: CopyFiles@2
+  displayName: 'Copy prereq libs PuTTY'
+  inputs:
+    sourceFolder: libs/putty/
+    targetFolder: $(Build.ArtifactStagingDirectory)/libs/putty
+- task: CopyFiles@2
+  displayName: 'Copy prereq libs SFMT'
+  inputs:
+    sourceFolder: libs/SFMT/
+    targetFolder: $(Build.ArtifactStagingDirectory)/libs/SFMT
+- task: CopyFiles@2
+  displayName: 'Copy prereq libs Zlib'
+  inputs:
+    sourceFolder: libs/zlib/
+    targetFolder: $(Build.ArtifactStagingDirectory)/libs/zlib
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish prereq libs'
+  inputs:
+    artifactName: $(System.Jobname)-libs
+    pathtoPublish: $(Build.ArtifactStagingDirectory)/libs
